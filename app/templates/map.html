@@ -1,0 +1,199 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Kenya Map Only</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@latest/ol.css">
+    <script src="https://cdn.jsdelivr.net/npm/ol@latest/dist/ol.js"></script>
+    <style>
+        body {
+            display: flex;
+            flex-direction: row;
+            height: 100vh;
+            margin: 0;
+            font-family: Arial, sans-serif;
+        }
+
+        #map {
+            width: 75%;
+            height: 100%;
+        }
+
+        .card-container {
+            width: 25%;
+            padding: 20px;
+            background-color: #f4f7fb;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin: 20px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            height: calc(100vh - 40px); /* Full height minus the margin */
+        }
+
+        .tooltip {
+            position: absolute;
+            background-color:white;
+            padding: 5px;
+            border: 1px solid #ccc;
+            pointer-events: none;
+            font-size: 12px;
+            display: none;
+            z-index: 100;
+        }
+
+        .card {
+            width: 100%;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+
+        .card-title {
+            font-size: 24px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .card-subtitle {
+            font-size: 18px;
+            color: #555;
+            margin-bottom: 20px;
+        }
+
+        .card-text {
+            font-size: 16px;
+            color: #777;
+            margin-bottom: 10px;
+        }
+
+        .card-body {
+            padding: 10px;
+        }
+
+        .card p {
+            font-weight: 500;
+        }
+
+        .card-text span {
+            font-weight: 700;
+            color: #333;
+        }
+    </style>
+</head>
+<body>
+    <div id="map"></div>
+
+    <div class="card-container">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title" style="color: #e53935;">Select County</h5>
+                <h6 class="card-subtitle mb-2 text-body-secondary" style="color: #388e3c;">Select Municipality</h6>
+                <p class="card-text"><span id="county-code">County Code:</span></p>
+                <p class="card-text"><span id="county-constituency">Constituency:</span></p>
+                <p class="card-text"><span id="shape-area">Shape Area:</span></p>
+            </div>
+        </div>
+    </div>
+
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        var map = new ol.Map({
+            target: 'map',
+            layers: [
+                new ol.layer.Tile({
+                    source: new ol.source.OSM() 
+                })
+            ],
+            view: new ol.View({
+                center: ol.proj.fromLonLat([37.9062, -1.2921]),
+                zoom: 6.2,  
+                minZoom: 6.6,  
+                maxZoom: 6.8
+            })
+        });
+
+        var kenyaLayer = new ol.layer.Vector({
+            source: new ol.source.Vector({
+                url: "{% static 'kenya.geojson' %}", 
+                format: new ol.format.GeoJSON()
+            }),
+            style: new ol.style.Style({
+                stroke: new ol.style.Stroke({ color: 'grey', width: 1 }),
+                fill: new ol.style.Fill({ color: 'rgba(255, 0, 0, 0.1)' })
+            })
+        });
+
+        map.addLayer(kenyaLayer);
+
+        var tooltip = document.getElementById('tooltip');
+
+        var hoverInteraction = new ol.interaction.Select({
+            condition: ol.events.condition.pointerMove,
+            layers: [kenyaLayer], 
+            style: new ol.style.Style({
+                stroke: new ol.style.Stroke({ color: 'red', width: 1 }),
+                fill: new ol.style.Fill({ color: 'red' })
+            })
+        });
+
+        map.addInteraction(hoverInteraction);
+
+        // Event listener for hover
+        hoverInteraction.on('select', function (e) {
+            var feature = e.selected[0]; 
+
+            if (feature) {
+                var countyName = feature.get('COUNTY_NAM');
+                var countyCode = feature.get('COUNTY_COD');
+                var constituencyName = feature.get('CONSTITUEN');  
+                var shapeArea = feature.get('Shape_Area'); 
+
+                tooltip.innerHTML = 
+                    '<strong>' + countyName + '</strong><br>' + 
+                    'County Code: ' + countyCode + '<br>' + 
+                    'Constituency: ' + constituencyName + '<br>' + 
+                    'Shape Area: ' + shapeArea + ' sq.km';  
+                tooltip.style.display = 'block';
+
+                // Position the tooltip near the mouse pointer
+                var coordinates = e.mapBrowserEvent.coordinate;
+                var pixel = map.getPixelFromCoordinate(coordinates);
+                tooltip.style.left = pixel[0] + 'px';
+                tooltip.style.top = pixel[1] + 'px';
+            } else {
+                tooltip.style.display = 'none'; 
+            }
+        });
+
+        // Click interaction
+        var clickInteraction = new ol.interaction.Select({
+            condition: ol.events.condition.click,
+            layers: [kenyaLayer], 
+        });
+
+        map.addInteraction(clickInteraction);
+
+        // Event listener for click
+        clickInteraction.on('select', function (e) {
+            var feature = e.selected[0]; // Get the clicked feature
+
+            if (feature) {
+                var countyName = feature.get('COUNTY_NAM');
+                var countyCode = feature.get('COUNTY_COD');
+                var constituencyName = feature.get('CONSTITUEN');  
+                var shapeArea = feature.get('Shape_Area');
+
+                document.getElementById('county-code').innerHTML = 'County Code: ' + countyCode;
+                document.getElementById('county-constituency').innerHTML = 'Constituency: ' + constituencyName;
+                document.getElementById('shape-area').innerHTML = 'Shape Area: ' + shapeArea + ' sq.km';
+            }
+        });
+    </script>
+</body>
+</html>
